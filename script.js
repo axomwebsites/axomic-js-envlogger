@@ -1,183 +1,183 @@
-function var3() {
-    document.getElementById('var2').click();
+function importFile() {
+    document.getElementById('fileInput').click();
 }
 
-function var4(var11) {
-    const var12 = var11.target.files[0];
-    if (!var12) return;
+function handleFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
     
-    if (var12.name.endsWith('.zip')) {
-        var13(var12);
+    if (file.name.endsWith('.zip')) {
+        extractZip(file);
     } else {
-        const var14 = new FileReader();
-        var14.onload = function(var15) {
-            document.getElementById('var1').value = var15.target.result;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('inputCode').value = e.target.result;
         };
-        var14.readAsText(var12);
+        reader.readAsText(file);
     }
 }
 
-function var13(var16) {
-    const var17 = new JSZip();
-    var17.loadAsync(var16).then(function(var18) {
-        let var19 = '';
-        var18.forEach(function(var20, var21) {
-            if (var21.dir) return;
-            if (var20.endsWith('.js') || var20.endsWith('.txt')) {
-                var21.async('string').then(function(var22) {
-                    var19 += '// File: ' + var20 + '\n' + var22 + '\n\n';
-                    document.getElementById('var1').value = var19;
+function extractZip(zipFile) {
+    const zip = new JSZip();
+    zip.loadAsync(zipFile).then(function(content) {
+        let combinedCode = '';
+        content.forEach(function(relativePath, zipEntry) {
+            if (zipEntry.dir) return;
+            if (relativePath.endsWith('.js') || relativePath.endsWith('.txt')) {
+                zipEntry.async('string').then(function(fileContent) {
+                    combinedCode += '// File: ' + relativePath + '\n' + fileContent + '\n\n';
+                    document.getElementById('inputCode').value = combinedCode;
                 });
             }
         });
     });
 }
 
-function var5() {
-    const var23 = document.getElementById('var1').value;
-    if (!var23.trim()) {
+function processCode() {
+    const input = document.getElementById('inputCode').value;
+    if (!input.trim()) {
         alert('Please input code first');
         return;
     }
     
-    let var24 = var23;
-    var24 = var25(var24);
-    var24 = var26(var24);
-    var24 = var27(var24);
-    var24 = var28(var24);
-    var24 = var29(var24);
-    var24 = var30(var24);
-    var24 = var31(var24);
-    var24 = var32(var24);
-    var24 = var33(var24);
-    var24 = var34(var24);
+    let output = input;
+    output = decodeUnicode(output);
+    output = decodeHex(output);
+    output = decodeBase64(output);
+    output = simplifyExpressions(output);
+    output = renameVariables(output);
+    output = formatCode(output);
+    output = removeDeadCode(output);
+    output = unpackArrays(output);
+    output = resolveStrings(output);
+    output = normalizeControlFlow(output);
     
-    document.getElementById('var6').value = var24;
+    document.getElementById('outputCode').value = output;
 }
 
-function var25(var35) {
-    return var35.replace(/\\u([0-9a-fA-F]{4})/g, function(var36, var37) {
-        return String.fromCharCode(parseInt(var37, 16));
+function decodeUnicode(code) {
+    return code.replace(/\\u([0-9a-fA-F]{4})/g, function(match, hex) {
+        return String.fromCharCode(parseInt(hex, 16));
     });
 }
 
-function var26(var38) {
-    return var38.replace(/\\x([0-9a-fA-F]{2})/g, function(var39, var40) {
-        return String.fromCharCode(parseInt(var40, 16));
+function decodeHex(code) {
+    return code.replace(/\\x([0-9a-fA-F]{2})/g, function(match, hex) {
+        return String.fromCharCode(parseInt(hex, 16));
     });
 }
 
-function var27(var41) {
-    return var41.replace(/["']([a-zA-Z0-9+/=]{20,})["']/g, function(var42, var43) {
+function decodeBase64(code) {
+    return code.replace(/["']([a-zA-Z0-9+/=]{20,})["']/g, function(match, str) {
         try {
-            const var44 = atob(var43);
-            if (/^[\x20-\x7E]+$/.test(var44)) {
-                return '"' + var44 + '"';
+            const decoded = atob(str);
+            if (/^[\x20-\x7E]+$/.test(decoded)) {
+                return '"' + decoded + '"';
             }
-        } catch (var45) {}
-        return var42;
+        } catch (e) {}
+        return match;
     });
 }
 
-function var28(var46) {
-    var46 = var46.replace(/\b(true|false|null|undefined)\b/g, function(var47) {
-        return var47;
+function simplifyExpressions(code) {
+    code = code.replace(/\b(true|false|null|undefined)\b/g, function(val) {
+        return val;
     });
-    var46 = var46.replace(/==/g, '===');
-    var46 = var46.replace(/!=/g, '!==');
-    return var46;
+    code = code.replace(/==/g, '===');
+    code = code.replace(/!=/g, '!==');
+    return code;
 }
 
-function var29(var48) {
-    const var49 = {};
-    let var50 = 0;
-    return var48.replace(/\bvar\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/g, function(var51, var52) {
-        if (!var49[var52]) {
-            var50++;
-            var49[var52] = 'var' + var50;
+function renameVariables(code) {
+    const varMap = {};
+    let counter = 0;
+    return code.replace(/\bvar\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/g, function(match, name) {
+        if (!varMap[name]) {
+            counter++;
+            varMap[name] = 'v' + counter;
         }
-        return 'var ' + var49[var52] + ' =';
-    }).replace(new RegExp('\\b(' + Object.keys(var49).join('|') + ')\\b', 'g'), function(var53) {
-        return var49[var53] || var53;
+        return 'var ' + varMap[name] + ' =';
+    }).replace(new RegExp('\\b(' + Object.keys(varMap).join('|') + ')\\b', 'g'), function(name) {
+        return varMap[name] || name;
     });
 }
 
-function var30(var54) {
-    let var55 = 0;
-    let var56 = '';
-    for (let var57 = 0; var57 < var54.length; var57++) {
-        const var58 = var54[var57];
-        if (var58 === '{') {
-            var55++;
-            var56 += '\n' + '  '.repeat(var55) + '{';
-        } else if (var58 === '}') {
-            var55--;
-            var56 += '\n' + '  '.repeat(var55) + '}';
-        } else if (var58 === ';') {
-            var56 += ';\n' + '  '.repeat(var55);
+function formatCode(code) {
+    let indent = 0;
+    let result = '';
+    for (let i = 0; i < code.length; i++) {
+        const char = code[i];
+        if (char === '{') {
+            indent++;
+            result += '\n' + '  '.repeat(indent) + '{';
+        } else if (char === '}') {
+            indent--;
+            result += '\n' + '  '.repeat(indent) + '}';
+        } else if (char === ';') {
+            result += ';\n' + '  '.repeat(indent);
         } else {
-            var56 += var58;
+            result += char;
         }
     }
-    return var56;
+    return result;
 }
 
-function var31(var59) {
-    var59 = var59.replace(/if\s*\(\s*true\s*\)/g, 'if (true)');
-    var59 = var59.replace(/if\s*\(\s*false\s*\)\s*{[^}]*}/g, '');
-    var59 = var59.replace(/while\s*\(\s*false\s*\)\s*{[^}]*}/g, '');
-    return var59;
+function removeDeadCode(code) {
+    code = code.replace(/if\s*\(\s*true\s*\)/g, 'if (true)');
+    code = code.replace(/if\s*\(\s*false\s*\)\s*{[^}]*}/g, '');
+    code = code.replace(/while\s*\(\s*false\s*\)\s*{[^}]*}/g, '');
+    return code;
 }
 
-function var32(var60) {
-    return var60.replace(/\[\s*(['"])(.*?)\1\s*\]/g, function(var61, var62, var63) {
-        return '.' + var63;
+function unpackArrays(code) {
+    return code.replace(/\[\s*(['"])(.*?)\1\s*\]/g, function(match, quote, prop) {
+        return '.' + prop;
     });
 }
 
-function var33(var64) {
-    var64 = var64.replace(/String\.fromCharCode\((\d+(?:,\d+)*)\)/g, function(var65, var66) {
-        const var67 = var66.split(',').map(Number);
-        return '"' + String.fromCharCode(...var67) + '"';
+function resolveStrings(code) {
+    code = code.replace(/String\.fromCharCode\((\d+(?:,\d+)*)\)/g, function(match, nums) {
+        const values = nums.split(',').map(Number);
+        return '"' + String.fromCharCode(...values) + '"';
     });
-    return var64;
+    return code;
 }
 
-function var34(var68) {
-    var68 = var68.replace(/\+\s*['"]/g, '+ "');
-    var68 = var68.replace(/"\s*\+/g, '" + ');
-    var68 = var68.replace(/['"][\s\n]*\+[\s\n]*['"]/g, '');
-    return var68;
+function normalizeControlFlow(code) {
+    code = code.replace(/\+\s*['"]/g, '+ "');
+    code = code.replace(/"\s*\+/g, '" + ');
+    code = code.replace(/['"][\s\n]*\+[\s\n]*['"]/g, '');
+    return code;
 }
 
-function var7() {
-    const var69 = document.getElementById('var6');
-    var69.select();
+function copyCode() {
+    const output = document.getElementById('outputCode');
+    output.select();
     document.execCommand('copy');
     alert('Copied to clipboard');
 }
 
-function var8() {
-    const var70 = document.getElementById('var9');
-    var70.style.display = var70.style.display === 'none' ? 'inline-block' : 'none';
+function toggleDownload() {
+    const options = document.getElementById('downloadOptions');
+    options.style.display = options.style.display === 'none' ? 'inline-block' : 'none';
 }
 
-function var10(var71) {
-    const var72 = document.getElementById('var6').value;
-    if (!var72.trim()) {
+function downloadFile(extension) {
+    const content = document.getElementById('outputCode').value;
+    if (!content.trim()) {
         alert('No output to download');
         return;
     }
     
-    const var73 = new Blob([var72], { type: 'text/plain' });
-    const var74 = URL.createObjectURL(var73);
-    const var75 = document.createElement('a');
-    var75.href = var74;
-    var75.download = 'deobfuscated.' + var71;
-    document.body.appendChild(var75);
-    var75.click();
-    document.body.removeChild(var75);
-    URL.revokeObjectURL(var74);
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'deobfuscated.' + extension;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
     
-    document.getElementById('var9').style.display = 'none';
-  }
+    document.getElementById('downloadOptions').style.display = 'none';
+}
