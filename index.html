@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Env Log</title>
+    <title>Axomic Js Env Logger</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.10.0/acorn.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
-<body>
+<body class="dark">
     <div class="container">
         <header>
             <h1>Env Log</h1>
             <small>made by axom</small>
-            <div class="theme-selector">
+            <div class="themeselector">
                 <select id="themeselect" onchange="changetheme(this.value)">
                     <option value="dark">Dark Mode</option>
                     <option value="bright">Bright Mode</option>
@@ -24,7 +24,7 @@
             </div>
         </header>
         
-        <div class="input-section">
+        <div class="inputsection">
             <textarea id="inputcode" placeholder="Paste obfuscated JavaScript code here..."></textarea>
             <div class="buttongroup">
                 <button onclick="importfile()">Import from File/Zip</button>
