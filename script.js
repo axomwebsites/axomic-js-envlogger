@@ -65,15 +65,22 @@ function processcode() {
         output = resolvedynamicgeneration(output);
         output = extractvmbytecode(output);
         
-        const ast = acorn.parse(output, { ecmaVersion: 2020 });
-        const transformedast = transformast(ast);
-        output = generatecode(transformedast);
-        
         output = unflattencontrolflowadvanced(output);
         output = removedeadcode(output);
         output = normalizepropertyaccess(output);
         output = mergestringconcatenation(output);
         output = resolveevalcalls(output);
+        
+        let astparsed = false;
+        try {
+            const ast = acorn.parse(output, { ecmaVersion: 2020, allowReturnOutsideFunction: true });
+            const transformedast = transformast(ast);
+            output = generatecode(transformedast);
+            astparsed = true;
+        } catch(parseerror) {
+            output = fallbackformat(output);
+        }
+        
         output = formatoutput(output);
         
         const endtime = performance.now();
@@ -83,7 +90,11 @@ function processcode() {
         
         document.getElementById('outputcode').value = header + output;
     } catch (error) {
-        document.getElementById('outputcode').value = 'Error during deobfuscation: ' + error.message;
+        const fallbackoutput = fallbackformat(input);
+        const endtime = performance.now();
+        const processtime = Math.round(endtime - starttime);
+        const header = '/*\ndeobfuscated/env logged by axomic-js-envlogger ( https://axomwebsites.github.io/axomic-js-envlogger/ ) \nprocessed in ' + processtime + ' ms\nOur Discord : https://discord.gg/Sps39CydcZ | Our Youtube : https://youtube.com/@axos0022\n*/\n\n';
+        document.getElementById('outputcode').value = header + fallbackoutput;
     }
 }
 
@@ -332,8 +343,20 @@ function generatecode(node) {
                    generatecode(node.body);
         case 'ReturnStatement':
             return 'return' + (node.argument ? ' ' + generatecode(node.argument) : '') + ';';
+        case 'AssignmentExpression':
+            return generatecode(node.left) + ' ' + node.operator + ' ' + generatecode(node.right);
+        case 'ArrayExpression':
+            return '[' + node.elements.map(generatecode).join(', ') + ']';
+        case 'ObjectExpression':
+            return '{' + node.properties.map(function(p) {
+                return generatecode(p.key) + ': ' + generatecode(p.value);
+            }).join(', ') + '}';
+        case 'UnaryExpression':
+            return node.operator + generatecode(node.argument);
+        case 'SequenceExpression':
+            return node.expressions.map(generatecode).join(', ');
         default:
-            return JSON.stringify(node);
+            return '';
     }
 }
 
@@ -404,6 +427,47 @@ function resolveevalcalls(code) {
     });
 }
 
+function fallbackformat(code) {
+    let result = '';
+    let currentline = '';
+    let indentlevel = 0;
+    
+    for (let i = 0; i < code.length; i++) {
+        const char = code[i];
+        
+        if (char === '{') {
+            currentline += char;
+            result += currentline.trim() + '\n';
+            indentlevel++;
+            currentline = '  '.repeat(indentlevel);
+        } else if (char === '}') {
+            if (currentline.trim()) {
+                result += currentline.trim() + '\n';
+            }
+            indentlevel = Math.max(0, indentlevel - 1);
+            currentline = '  '.repeat(indentlevel);
+            currentline += char;
+        } else if (char === ';') {
+            currentline += char;
+            result += currentline.trim() + '\n';
+            currentline = '  '.repeat(indentlevel);
+        } else if (char === '\n' || char === '\r') {
+            if (currentline.trim()) {
+                result += currentline.trim() + '\n';
+            }
+            currentline = '  '.repeat(indentlevel);
+        } else {
+            currentline += char;
+        }
+    }
+    
+    if (currentline.trim()) {
+        result += currentline.trim();
+    }
+    
+    return result;
+}
+
 function formatoutput(code) {
     let indent = 0;
     let result = '';
@@ -411,16 +475,20 @@ function formatoutput(code) {
     
     lines.forEach(function(line) {
         const trimmed = line.trim();
-        if (trimmed.includes('}')) {
+        if (!trimmed) return;
+        
+        if (trimmed.startsWith('}')) {
             indent = Math.max(0, indent - 1);
         }
+        
         result += '  '.repeat(indent) + trimmed + '\n';
-        if (trimmed.includes('{')) {
+        
+        if (trimmed.endsWith('{')) {
             indent++;
         }
     });
     
-    return result;
+    return result.trim();
 }
 
 function copycode() {
@@ -453,4 +521,4 @@ function downloadfile(extension) {
     URL.revokeObjectURL(url);
     
     document.getElementById('downloadoptions').style.display = 'none';
-                       }
+}
