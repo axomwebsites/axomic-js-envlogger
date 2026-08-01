@@ -5,32 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Env Log</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.10.0/acorn.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Env Log</h1>
             <small>made by axom</small>
+            <div class="theme-selector">
+                <select id="themeselect" onchange="changetheme(this.value)">
+                    <option value="dark">Dark Mode</option>
+                    <option value="bright">Bright Mode</option>
+                    <option value="glass">Glassmorphism</option>
+                    <option value="terminal">Terminal</option>
+                    <option value="cyber">Cyberpunk</option>
+                </select>
+            </div>
         </header>
         
         <div class="input-section">
-            <textarea id="inputCode" placeholder="Paste obfuscated JavaScript code here..."></textarea>
-            <div class="button-group">
-                <button onclick="importFile()">Import from File/Zip</button>
-                <input type="file" id="fileInput" style="display:none" accept=".js,.txt,.zip" onchange="handleFile(event)">
+            <textarea id="inputcode" placeholder="Paste obfuscated JavaScript code here..."></textarea>
+            <div class="buttongroup">
+                <button onclick="importfile()">Import from File/Zip</button>
+                <input type="file" id="fileinput" style="display:none" accept=".js,.txt,.zip" onchange="handlefile(event)">
             </div>
         </div>
         
-        <button class="process-btn" onclick="processCode()">Process Code</button>
+        <button class="processbtn" onclick="processcode()">Process Code</button>
         
-        <div class="output-section">
-            <textarea id="outputCode" readonly placeholder="Deobfuscated output will appear here..."></textarea>
-            <div class="output-buttons">
-                <button onclick="copyCode()">Copy</button>
-                <button onclick="toggleDownload()">Download (As File)</button>
-                <div id="downloadOptions" class="download-options" style="display:none">
-                    <button onclick="downloadFile('txt')">Download as .txt</button>
-                    <button onclick="downloadFile('js')">Download as .js</button>
+        <div class="outputsection">
+            <textarea id="outputcode" readonly placeholder="Deobfuscated output will appear here..."></textarea>
+            <div class="outputbuttons">
+                <button onclick="copycode()">Copy</button>
+                <button onclick="toggledownload()">Download (As File)</button>
+                <div id="downloadoptions" class="downloadoptions" style="display:none">
+                    <button onclick="downloadfile('txt')">Download as .txt</button>
+                    <button onclick="downloadfile('js')">Download as .js</button>
                 </div>
             </div>
         </div>
