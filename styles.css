@@ -134,13 +134,13 @@ header small {
     font-size: 0.9em;
 }
 
-.theme-selector {
+.themeselector {
     position: absolute;
     top: 0;
     right: 0;
 }
 
-.theme-selector select {
+.themeselector select {
     padding: 8px 15px;
     border-radius: 5px;
     font-family: inherit;
@@ -148,37 +148,37 @@ header small {
     outline: none;
 }
 
-body.dark .theme-selector select {
+body.dark .themeselector select {
     background: #333;
     color: #fff;
     border: 1px solid #555;
 }
 
-body.bright .theme-selector select {
+body.bright .themeselector select {
     background: #fff;
     color: #2c2c2c;
     border: 1px solid #ccc;
 }
 
-body.glass .theme-selector select {
+body.glass .themeselector select {
     background: rgba(255, 255, 255, 0.2);
     color: #fff;
     border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-body.terminal .theme-selector select {
+body.terminal .themeselector select {
     background: #000;
     color: #00ff00;
     border: 1px solid #00ff00;
 }
 
-body.cyber .theme-selector select {
+body.cyber .themeselector select {
     background: #0d0221;
     color: #00f3ff;
     border: 1px solid #00f3ff;
 }
 
-.input-section, .outputsection {
+.inputsection, .outputsection {
     margin-bottom: 25px;
 }
 
@@ -373,8 +373,8 @@ body.cyber .warning {
         padding: 15px;
     }
     
-    .theme-selector {
+    .themeselector {
         position: static;
         margin-top: 15px;
     }
-    }
+}
