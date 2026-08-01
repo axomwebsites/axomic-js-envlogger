@@ -48,6 +48,7 @@ function processcode() {
     
     try {
         let output = input;
+        
         output = decodeunicode(output);
         output = decodehex(output);
         output = decodebase64strings(output);
@@ -56,12 +57,19 @@ function processcode() {
         output = simplifystaticexpressions(output);
         output = decoderot13(output);
         output = decodereversestrings(output);
+        output = resolvexorstrings(output);
+        
+        output = detectandunpackheavypacking(output);
+        output = removeantitamperingchecks(output);
+        output = neutralizeproxytraps(output);
+        output = resolvedynamicgeneration(output);
+        output = extractvmbytecode(output);
         
         const ast = acorn.parse(output, { ecmaVersion: 2020 });
         const transformedast = transformast(ast);
         output = generatecode(transformedast);
         
-        output = unflattencontrolflow(output);
+        output = unflattencontrolflowadvanced(output);
         output = removedeadcode(output);
         output = normalizepropertyaccess(output);
         output = mergestringconcatenation(output);
@@ -168,6 +176,75 @@ function decodereversestrings(code) {
     });
 }
 
+function resolvexorstrings(code) {
+    const xorpattern = /function\s*\w+\s*\(\s*\w+\s*,\s*\w+\s*\)\s*{[^}]*}/g;
+    let match;
+    while ((match = xorpattern.exec(code)) !== null) {
+        const funcbody = match[0];
+        if (funcbody.includes('^') && funcbody.includes('charCodeAt')) {
+            code = code.replace(match[0], '');
+        }
+    }
+    return code;
+}
+
+function detectandunpackheavypacking(code) {
+    if (code.includes('webpackJsonp') || code.includes('__webpack_require__')) {
+        code = code.replace(/\/\*!.*?\*\//g, '');
+        code = code.replace(/webpackChunk\w+\s*=\s*\[\];/g, '');
+    }
+    if (code.includes('(function(') && code.includes('module,exports,__webpack_require__')) {
+        code = code.replace(/^\s*\(function\([^)]*\)\s*{/, '');
+        code = code.replace(/}\)\.call\([^)]*\);\s*$/, '');
+    }
+    return code;
+}
+
+function removeantitamperingchecks(code) {
+    code = code.replace(/if\s*\(\s*window\s*\.\s*location\s*\.\s*hostname\s*!==\s*["'][^"']*["']\s*\)\s*{[^}]*}/g, '');
+    code = code.replace(/debugger;/g, '');
+    code = code.replace(/console\s*\.\s*log\s*\(\s*['"]debug['"]\s*\)/g, '');
+    code = code.replace(/setInterval\s*\(\s*function\s*\(\s*\)\s*{\s*debugger\s*;?\s*}\s*,\s*\d+\s*\)/g, '');
+    return code;
+}
+
+function neutralizeproxytraps(code) {
+    code = code.replace(/new\s+Proxy\s*\(\s*[^,]+,\s*{[^}]*}\s*\)/g, function(match) {
+        const objmatch = match.match(/new\s+Proxy\s*\(\s*([^,]+)/);
+        if (objmatch) {
+            return objmatch[1].trim();
+        }
+        return match;
+    });
+    return code;
+}
+
+function resolvedynamicgeneration(code) {
+    code = code.replace(/new\s+Function\s*\(\s*["']([^"']+)["']\s*\)/g, function(match, body) {
+        return '(function() { ' + body + ' })';
+    });
+    code = code.replace(/eval\s*\(\s*["']([^"']+)["']\s*\)/g, '$1');
+    return code;
+}
+
+function extractvmbytecode(code) {
+    const vmpattern = /var\s+\w+\s*=\s*\[\s*\d+(?:\s*,\s*\d+)*\s*\]/g;
+    let match;
+    while ((match = vmpattern.exec(code)) !== null) {
+        const arraydef = match[0];
+        const numbers = arraydef.match(/\d+/g);
+        if (numbers && numbers.length > 10) {
+            const decoded = numbers.map(function(n) {
+                return String.fromCharCode(parseInt(n));
+            }).join('');
+            if (/^[a-zA-Z0-9_{}()[\];,.\s]+$/.test(decoded)) {
+                code = code.replace(arraydef, '"' + decoded + '"');
+            }
+        }
+    }
+    return code;
+}
+
 function transformast(astnode) {
     if (!astnode || typeof astnode !== 'object') return astnode;
     
@@ -260,7 +337,7 @@ function generatecode(node) {
     }
 }
 
-function unflattencontrolflow(code) {
+function unflattencontrolflowadvanced(code) {
     const switchpattern = /switch\s*\(\s*(\w+)\s*\)\s*{([^}]*(?:{[^}]*}[^}]*)*)}/g;
     let match;
     while ((match = switchpattern.exec(code)) !== null) {
@@ -270,15 +347,29 @@ function unflattencontrolflow(code) {
         const cases = switchbody.match(/case\s+(\d+):\s*([^}]+?)(?=case|default|})/g);
         if (cases) {
             let reconstructed = '';
+            const casemap = {};
             cases.forEach(function(caseblock) {
                 const casematch = caseblock.match(/case\s+(\d+):\s*([\s\S]*?)(?=\s*break|\s*case|\s*default|$)/);
                 if (casematch) {
-                    reconstructed += casematch[2].trim() + '\n';
+                    casemap[parseInt(casematch[1])] = casematch[2].trim();
                 }
             });
+            
+            const sortedkeys = Object.keys(casemap).map(Number).sort(function(a, b) { return a - b; });
+            sortedkeys.forEach(function(key) {
+                reconstructed += casemap[key] + '\n';
+            });
+            
             code = code.replace(match[0], reconstructed);
         }
     }
+    
+    const whilepattern = /while\s*\(\s*true\s*\)\s*{([^}]*(?:{[^}]*}[^}]*)*)}/g;
+    while ((match = whilepattern.exec(code)) !== null) {
+        const loopbody = match[1];
+        code = code.replace(match[0], loopbody);
+    }
+    
     return code;
 }
 
@@ -362,4 +453,4 @@ function downloadfile(extension) {
     URL.revokeObjectURL(url);
     
     document.getElementById('downloadoptions').style.display = 'none';
-}
+                       }
