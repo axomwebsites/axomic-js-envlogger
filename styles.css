@@ -5,40 +5,126 @@
 }
 
 body {
-    background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
-    color: #e0e0e0;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Courier New', Courier, monospace;
     min-height: 100vh;
     padding: 20px;
+    transition: all 0.3s ease;
+}
+
+body.dark {
+    background: #1a1a1a;
+    color: #d4d4d4;
+}
+
+body.bright {
+    background: #f5f5f5;
+    color: #2c2c2c;
+}
+
+body.glass {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+}
+
+body.terminal {
+    background: #000;
+    color: #00ff00;
+}
+
+body.cyber {
+    background: #0d0221;
+    color: #00f3ff;
 }
 
 .container {
     max-width: 1400px;
     margin: 0 auto;
-    background: rgba(20, 20, 30, 0.95);
-    border-radius: 15px;
     padding: 40px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 100px rgba(100, 100, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+body.dark .container {
+    background: #242424;
+    border: 1px solid #333;
+}
+
+body.bright .container {
+    background: #fff;
+    border: 1px solid #ddd;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+body.glass .container {
+    background: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+body.terminal .container {
+    background: #0a0a0a;
+    border: 2px solid #00ff00;
+}
+
+body.cyber .container {
+    background: rgba(13, 2, 33, 0.9);
+    border: 1px solid #00f3ff;
+    box-shadow: 0 0 20px rgba(0, 243, 255, 0.3);
 }
 
 header {
     text-align: center;
     margin-bottom: 40px;
     padding-bottom: 25px;
-    border-bottom: 3px solid transparent;
-    border-image: linear-gradient(90deg, #667eea 0%, #764ba2 100%) 1;
+    position: relative;
+}
+
+body.dark header {
+    border-bottom: 2px solid #444;
+}
+
+body.bright header {
+    border-bottom: 2px solid #eee;
+}
+
+body.glass header {
+    border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+body.terminal header {
+    border-bottom: 2px solid #00ff00;
+}
+
+body.cyber header {
+    border-bottom: 2px solid #00f3ff;
 }
 
 header h1 {
     font-size: 3em;
-    letter-spacing: 5px;
+    letter-spacing: 8px;
     text-transform: uppercase;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    font-weight: 800;
+    font-weight: 900;
+}
+
+body.dark header h1 {
+    color: #fff;
+}
+
+body.bright header h1 {
+    color: #2c2c2c;
+}
+
+body.glass header h1 {
+    color: #fff;
+    text-shadow: 0 0 10px rgba(255,255,255,0.5);
+}
+
+body.terminal header h1 {
+    color: #00ff00;
+}
+
+body.cyber header h1 {
+    color: #00f3ff;
+    text-shadow: 0 0 10px #00f3ff;
 }
 
 header small {
@@ -46,20 +132,59 @@ header small {
     margin-top: 8px;
     opacity: 0.6;
     font-size: 0.9em;
-    color: #888;
 }
 
-.input-section, .output-section {
+.theme-selector {
+    position: absolute;
+    top: 0;
+    right: 0;
+}
+
+.theme-selector select {
+    padding: 8px 15px;
+    border-radius: 5px;
+    font-family: inherit;
+    cursor: pointer;
+    outline: none;
+}
+
+body.dark .theme-selector select {
+    background: #333;
+    color: #fff;
+    border: 1px solid #555;
+}
+
+body.bright .theme-selector select {
+    background: #fff;
+    color: #2c2c2c;
+    border: 1px solid #ccc;
+}
+
+body.glass .theme-selector select {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+body.terminal .theme-selector select {
+    background: #000;
+    color: #00ff00;
+    border: 1px solid #00ff00;
+}
+
+body.cyber .theme-selector select {
+    background: #0d0221;
+    color: #00f3ff;
+    border: 1px solid #00f3ff;
+}
+
+.input-section, .outputsection {
     margin-bottom: 25px;
 }
 
 textarea {
     width: 100%;
     min-height: 350px;
-    background: rgba(10, 10, 15, 0.8);
-    color: #00ff88;
-    border: 2px solid #333;
-    border-radius: 10px;
     padding: 20px;
     font-family: 'Consolas', 'Monaco', monospace;
     font-size: 14px;
@@ -67,56 +192,113 @@ textarea {
     outline: none;
     transition: all 0.3s ease;
     line-height: 1.6;
+    border-radius: 5px;
 }
 
-textarea:focus {
-    border-color: #667eea;
-    box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
-    background: rgba(10, 10, 15, 0.95);
+body.dark textarea {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border: 1px solid #444;
 }
 
-.button-group {
+body.bright textarea {
+    background: #fafafa;
+    color: #2c2c2c;
+    border: 1px solid #ddd;
+}
+
+body.glass textarea {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+body.terminal textarea {
+    background: #000;
+    color: #00ff00;
+    border: 1px solid #00ff00;
+}
+
+body.cyber textarea {
+    background: rgba(13, 2, 33, 0.8);
+    color: #00f3ff;
+    border: 1px solid #00f3ff;
+}
+
+.buttongroup {
     margin-top: 15px;
 }
 
 button {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
     padding: 12px 25px;
-    font-family: 'Segoe UI', sans-serif;
+    font-family: inherit;
     font-weight: 600;
     cursor: pointer;
-    border-radius: 8px;
+    border-radius: 5px;
     margin: 5px;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    transition: all 0.2s ease;
     font-size: 14px;
+    border: none;
 }
 
-button:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+body.dark button {
+    background: #444;
+    color: #fff;
 }
 
-button:active {
-    transform: translateY(-1px);
+body.dark button:hover {
+    background: #555;
 }
 
-.process-btn {
+body.bright button {
+    background: #2c2c2c;
+    color: #fff;
+}
+
+body.bright button:hover {
+    background: #444;
+}
+
+body.glass button {
+    background: rgba(255, 255, 255, 0.3);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+body.glass button:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+body.terminal button {
+    background: #000;
+    color: #00ff00;
+    border: 1px solid #00ff00;
+}
+
+body.terminal button:hover {
+    background: #00ff00;
+    color: #000;
+}
+
+body.cyber button {
+    background: transparent;
+    color: #00f3ff;
+    border: 1px solid #00f3ff;
+}
+
+body.cyber button:hover {
+    background: rgba(0, 243, 255, 0.2);
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.5);
+}
+
+.processbtn {
     width: 100%;
     padding: 18px;
     font-size: 1.3em;
     margin: 25px 0;
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    box-shadow: 0 4px 15px rgba(245, 87, 108, 0.3);
 }
 
-.process-btn:hover {
-    box-shadow: 0 8px 25px rgba(245, 87, 108, 0.5);
-}
-
-.output-buttons {
+.outputbuttons {
     margin-top: 15px;
     display: flex;
     gap: 12px;
@@ -124,30 +306,47 @@ button:active {
     flex-wrap: wrap;
 }
 
-.download-options {
+.downloadoptions {
     display: inline-block;
     margin-left: 10px;
 }
 
-.download-options button {
-    background: rgba(102, 126, 234, 0.2);
-    border: 2px solid #667eea;
+.downloadoptions button {
     font-size: 0.9em;
     padding: 10px 18px;
-}
-
-.download-options button:hover {
-    background: rgba(102, 126, 234, 0.4);
 }
 
 .warning {
     text-align: center;
     margin-top: 40px;
     padding: 20px;
-    border-top: 2px solid rgba(255, 255, 255, 0.1);
     opacity: 0.5;
     font-size: 0.95em;
+}
+
+body.dark .warning {
+    border-top: 1px solid #444;
     color: #888;
+}
+
+body.bright .warning {
+    border-top: 1px solid #ddd;
+    color: #666;
+}
+
+body.glass .warning {
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+body.terminal .warning {
+    border-top: 1px solid #00ff00;
+    color: #00ff00;
+}
+
+body.cyber .warning {
+    border-top: 1px solid #00f3ff;
+    color: #00f3ff;
 }
 
 @media (max-width: 768px) {
@@ -169,8 +368,13 @@ button:active {
         font-size: 13px;
     }
     
-    .process-btn {
+    .processbtn {
         font-size: 1.1em;
         padding: 15px;
     }
-}
+    
+    .theme-selector {
+        position: static;
+        margin-top: 15px;
+    }
+    }
