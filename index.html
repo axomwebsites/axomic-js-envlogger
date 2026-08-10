@@ -1,56 +1,339 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Env Log</title>
-    <link rel="stylesheet" href="styles.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.10.0/acorn.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>axomic js envlogger</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#f8f9fa;color:#212529;font-family:'Segoe UI','Fira Code',monospace;padding:24px 20px;transition:background .2s,color .2s}
+    body.dark{background:#1e1e2f;color:#e2e8f0}
+    body.dark .panel,body.dark .envcard,body.dark button,body.dark select{background:#2a2a3a;border-color:#3a3a4a}
+    body.dark textarea{background:#0f0f1a;color:#e2e8f0}
+    body.blue{background:#e6f0ff;color:#003366}
+    body.blue .panel,body.blue .envcard,body.blue button,body.blue select{background:#d4e4ff;border-color:#a0c4ff}
+    body.blue textarea{background:#c2d9ff;color:#003366}
+    .container{max-width:1600px;margin:0 auto}
+    h1{font-size:1.8rem;font-weight:600;margin-bottom:6px}
+    .sub{font-size:.75rem;opacity:.7;margin-bottom:24px;border-left:3px solid #0d6efd;padding-left:12px}
+    .toolbar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px;align-items:center}
+    select,button{background:#fff;border:1px solid #dee2e6;padding:6px 16px;font-family:monospace;font-size:.8rem;cursor:pointer;border-radius:30px}
+    button.primary{background:#0d6efd;color:#fff;border-color:#0d6efd}
+    .flexrow{display:flex;gap:20px;flex-wrap:wrap}
+    .panel{flex:1;min-width:300px;background:#fff;border:1px solid #dee2e6;border-radius:20px;overflow:hidden;margin-bottom:24px}
+    .panelhead{background:#f1f3f5;padding:10px 18px;border-bottom:1px solid #dee2e6;font-size:.75rem;font-weight:600;display:flex;justify-content:space-between}
+    textarea{width:100%;background:#e9ecef;border:none;font-family:'Courier New',monospace;font-size:12px;line-height:1.45;padding:16px;resize:vertical;outline:none}
+    textarea:focus{outline:1px solid #0d6efd}
+    .envcard{background:#fff;border:1px solid #dee2e6;border-radius:20px;margin-top:16px}
+    .envhead{background:#f1f3f5;padding:8px 18px;font-size:.7rem;border-bottom:1px solid #dee2e6}
+    pre{margin:0;padding:14px;overflow-x:auto;font-size:11px;background:#e9ecef;max-height:260px}
+    .badge{background:#e9ecef;padding:2px 10px;border-radius:30px;font-size:.7rem}
+    .checkbox-row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:8px 0}
+    .checkbox-row label{display:flex;align-items:center;gap:4px;font-size:.75rem}
+  </style>
 </head>
-<body class="dark">
-    <div class="container">
-        <header>
-            <h1>Env Log</h1>
-            <small>made by axom</small>
-            <div class="themeselector">
-                <select id="themeselect" onchange="changetheme(this.value)">
-                    <option value="dark">Dark Mode</option>
-                    <option value="bright">Bright Mode</option>
-                    <option value="glass">Glassmorphism</option>
-                    <option value="terminal">Terminal</option>
-                    <option value="cyber">Cyberpunk</option>
-                </select>
-            </div>
-        </header>
-        
-        <div class="inputsection">
-            <textarea id="inputcode" placeholder="Paste obfuscated JavaScript code here..."></textarea>
-            <div class="buttongroup">
-                <button onclick="importfile()">Import from File/Zip</button>
-                <input type="file" id="fileinput" style="display:none" accept=".js,.txt,.zip" onchange="handlefile(event)">
-            </div>
-        </div>
-        
-        <button class="processbtn" onclick="processcode()">Process Code</button>
-        
-        <div class="outputsection">
-            <textarea id="outputcode" readonly placeholder="Deobfuscated output will appear here..."></textarea>
-            <div class="outputbuttons">
-                <button onclick="copycode()">Copy</button>
-                <button onclick="toggledownload()">Download (As File)</button>
-                <div id="downloadoptions" class="downloadoptions" style="display:none">
-                    <button onclick="downloadfile('txt')">Download as .txt</button>
-                    <button onclick="downloadfile('js')">Download as .js</button>
-                </div>
-            </div>
-        </div>
-        
-        <footer>
-            <p class="warning">you are responsible for your use of this JavaScript env logger.</p>
-        </footer>
+<body>
+<div class="container">
+  <div style="display:flex;justify-content:space-between;align-items:baseline">
+    <div><h1>axomic js envlogger</h1><div class="sub">full deobfuscation · ast transforms · env logging · jsx conversion</div></div>
+    <div><label>theme:</label><select id="themesel"><option value="light">light</option><option value="dark">dark</option><option value="blue">blue</option></select></div>
+  </div>
+  <div class="toolbar">
+    <button id="runbtn" class="primary">env log & deobfuscate</button>
+    <label for="fileup" style="background:#fff;padding:6px 16px;border-radius:30px;cursor:pointer;border:1px solid #dee2e6">upload .js</label>
+    <input type="file" id="fileup" accept=".js,.txt" style="display:none">
+    <button id="clearbtn">clear</button>
+    <button id="samplebtn">load sample</button>
+    <div class="checkbox-row">
+      <label><input type="checkbox" id="jsxcheck" checked> convert react.createElement to jsx</label>
     </div>
-    
-    <script src="script.js"></script>
+  </div>
+  <div class="flexrow">
+    <div class="panel"><div class="panelhead"><span>obfuscated input</span><span id="inputstat" class="badge">0 chars</span></div><textarea id="inputcode" rows="14"></textarea></div>
+    <div class="panel"><div class="panelhead"><span>deobfuscated output</span><div><button id="copyout" style="padding:2px 12px;">copy</button><button id="downloadout" style="padding:2px 12px;">save</button></div></div><textarea id="outputcode" readonly rows="14"></textarea></div>
+  </div>
+  <div class="envcard"><div class="envhead">environment snapshot</div><pre id="envpre">ready</pre></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/acorn-walk/8.3.2/walk.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/escodegen/2.1.0/escodegen.min.js"></script>
+<script>
+(function(){
+  const themesel=document.getElementById('themesel');
+  const docbody=document.body;
+  themesel.addEventListener('change',function(e){
+    docbody.classList.remove('dark','blue');
+    if(e.target.value!=='light') docbody.classList.add(e.target.value);
+  });
+  const inp=document.getElementById('inputcode');
+  const out=document.getElementById('outputcode');
+  const envpre=document.getElementById('envpre');
+  const runbtn=document.getElementById('runbtn');
+  const fileup=document.getElementById('fileup');
+  const clrbtn=document.getElementById('clearbtn');
+  const sampbtn=document.getElementById('samplebtn');
+  const copybtn=document.getElementById('copyout');
+  const dwnbtn=document.getElementById('downloadout');
+  const instat=document.getElementById('inputstat');
+  const jsxchk=document.getElementById('jsxcheck');
+  function updstat(){instat.innerText=inp.value.length+' chars';}
+  inp.addEventListener('input',updstat);
+  updstat();
+  function capenv(){
+    const e={};
+    if(typeof window!=='undefined'){
+      e.ua=navigator.userAgent;
+      e.plat=navigator.platform;
+      e.lang=navigator.language;
+      e.hwcon=navigator.hardwareConcurrency;
+      e.wd=navigator.webdriver;
+      e.url=location.href;
+      e.screen=screen.width+'x'+screen.height;
+    }
+    if(typeof process!=='undefined') e.nodever=process.version;
+    e.now=Date.now();
+    return e;
+  }
+  function safeval(ex){try{return new Function('return ('+ex+')')();}catch(e){return null;}}
+  class deob{
+    constructor(code,opts){this.code=code;this.opts=opts;this.ast=null;this.strs=new Map();this.vals=new Map();this.wraps=new Map();}
+    parse(){
+      try{this.ast=acorn.parse(this.code,{ecmaVersion:2022,sourceType:'script'});}
+      catch(e){try{this.ast=acorn.parse(this.code,{ecmaVersion:2022,sourceType:'module'});}catch(e2){throw new Error('parse: '+e2.message);}}
+      return this;
+    }
+    gen(){return escodegen.generate(this.ast,{format:{indent:'  ',semicolons:true}});}
+    collect(){
+      const w=acorn.walk;
+      w.simple(this.ast,{VariableDeclaration:function(n){
+        for(const d of n.declarations){
+          if(d.init&&d.init.type==='ArrayExpression'){
+            const name=d.id.name;
+            const elems=d.init.elements.map(function(e){
+              if(e.type==='Literal') return e.value;
+              if(e.type==='UnaryExpression'&&e.operator==='-'&&e.argument.type==='Literal') return -e.argument.value;
+              return null;
+            });
+            if(elems.every(function(v){return v!==null;})) this.strs.set(name,elems);
+          }
+        }
+      }.bind(this)});
+      return this;
+    }
+    resolve(){
+      const w=acorn.walk;
+      const reps=[];
+      w.simple(this.ast,{MemberExpression:function(n){
+        if(n.object.type==='Identifier'&&this.strs.has(n.object.name)){
+          if(n.property.type==='Literal'&&typeof n.property.value==='number'){
+            const idx=n.property.value;
+            const arr=this.strs.get(n.object.name);
+            if(idx>=0&&idx<arr.length){reps.push({node:n,val:arr[idx]});}
+          }
+        }
+      }.bind(this)});
+      for(const r of reps){
+        const newNode={type:'Literal',value:r.val};
+        const par=r.node.parent;const key=r.node.key;
+        if(par){par[key]=newNode;}
+      }
+      return this;
+    }
+    fold(){
+      const w=acorn.walk;let changed=true;
+      while(changed){
+        changed=false;
+        w.simple(this.ast,{
+          BinaryExpression:function(n){
+            if(n.left.type==='Literal'&&n.right.type==='Literal'){
+              const l=n.left.value;const r=n.right.value;let res;
+              switch(n.operator){
+                case'+':res=l+r;break;case'-':res=l-r;break;case'*':res=l*r;break;
+                case'/':res=l/r;break;case'%':res=l%r;break;case'**':res=l**r;break;
+                case'===':res=l===r;break;case'!==':res=l!==r;break;case'==':res=l==r;break;
+                case'!=':res=l!=r;break;case'>':res=l>r;break;case'<':res=l<r;break;
+                case'>=':res=l>=r;break;case'<=':res=l<=r;break;case'|':res=l|r;break;
+                case'&':res=l&r;break;case'^':res=l^r;break;case'<<':res=l<<r;break;
+                case'>>':res=l>>r;break;case'>>>':res=l>>>r;break;default:return;
+              }
+              const nl={type:'Literal',value:res};
+              const par=n.parent;const key=n.key;
+              if(par){par[key]=nl;changed=true;}
+            }
+          },
+          UnaryExpression:function(n){
+            if(n.argument.type==='Literal'){
+              const v=n.argument.value;let res;
+              switch(n.operator){
+                case'-':res=-v;break;case'+':res=+v;break;case'!':res=!v;break;
+                case'~':res=~v;break;case'typeof':res=typeof v;break;default:return;
+              }
+              const nl={type:'Literal',value:res};
+              const par=n.parent;const key=n.key;
+              if(par){par[key]=nl;changed=true;}
+            }
+          },
+          LogicalExpression:function(n){
+            if(n.left.type==='Literal'&&n.right.type==='Literal'){
+              const l=n.left.value;const r=n.right.value;let res;
+              switch(n.operator){
+                case'&&':res=l&&r;break;case'||':res=l||r;break;case'??':res=l??r;break;default:return;
+              }
+              const nl={type:'Literal',value:res};
+              const par=n.parent;const key=n.key;
+              if(par){par[key]=nl;changed=true;}
+            }
+          }
+        });
+      }
+      return this;
+    }
+    flatten(){
+      const w=acorn.walk;
+      w.simple(this.ast,{WhileStatement:function(n){
+        if(n.test.type==='Literal'&&n.test.value===true){
+          const body=n.body;
+          if(body.type==='BlockStatement'){
+            const stmts=body.body;
+            if(stmts.length>=2){
+              const first=stmts[0];const second=stmts[1];
+              if(first.type==='VariableDeclaration'&&second.type==='SwitchStatement'){
+                const stateVar=first.declarations[0].id.name;
+                const cases=second.cases;
+                const cmap=new Map();
+                let defblock=null;
+                for(const c of cases){
+                  if(c.test&&c.test.type==='Literal'&&typeof c.test.value==='number'){
+                    const num=c.test.value;
+                    const block=c.consequent.slice(0);
+                    const last=block[block.length-1];
+                    if(last&&last.type==='BreakStatement') block.pop();
+                    cmap.set(num,block);
+                  }else{
+                    defblock=c.consequent.slice(0);
+                    const last=defblock[defblock.length-1];
+                    if(last&&last.type==='BreakStatement') defblock.pop();
+                  }
+                }
+                const keys=Array.from(cmap.keys()).sort((a,b)=>a-b);
+                let allstmts=[];
+                for(const k of keys) allstmts.push(...cmap.get(k));
+                if(defblock) allstmts.push(...defblock);
+                const par=n.parent;const key=n.key;
+                if(par){par[key]={type:'BlockStatement',body:allstmts};}
+              }
+            }
+          }
+        }
+      }});
+      return this;
+    }
+    rmdead(){
+      const w=acorn.walk;const rems=[];
+      w.simple(this.ast,{
+        IfStatement:function(n){
+          if(n.test.type==='Literal'&&n.test.value===false){rems.push({node:n,parent:n.parent,key:n.key});}
+          if(n.test.type==='Literal'&&n.test.value===true){const par=n.parent;const key=n.key;if(par) par[key]=n.consequent;}
+        },
+        DebuggerStatement:function(n){rems.push({node:n,parent:n.parent,key:n.key});},
+        ExpressionStatement:function(n){
+          if(n.expression.type==='CallExpression'){
+            const c=n.expression.callee;
+            if(c.type==='MemberExpression'&&c.object.type==='Identifier'&&c.object.name==='console'){rems.push({node:n,parent:n.parent,key:n.key});}
+          }
+        }
+      });
+      for(const r of rems){
+        const par=r.parent;const key=r.key;
+        if(par&&Array.isArray(par[key])){
+          const idx=par[key].indexOf(r.node);
+          if(idx!==-1) par[key].splice(idx,1);
+        }else if(par&&par[key]===r.node){
+          par[key]={type:'EmptyStatement'};
+        }
+      }
+      return this;
+    }
+    rename(){
+      const reserved=new Set(['true','false','null','undefined','NaN','Infinity','this','arguments','eval','function','return','var','let','const','if','else','for','while','do','switch','case','break','continue','try','catch','finally','throw','new','typeof','instanceof','in','delete','void','with','debugger','class','extends','super','import','export','default','static','yield','await','of','from','as','get','set','object','array','string','number','boolean','json','math','date','regexp','promise','fetch','console','navigator','window','document','atob','btoa']);
+      const used=new Set();const map=new Map();let cnt=0;
+      function next(){cnt++;let n='';let c=cnt;while(c>0){const rem=(c-1)%26;n=String.fromCharCode(97+rem)+n;c=Math.floor((c-1)/26);}return n;}
+      const w=acorn.walk;
+      w.simple(this.ast,{Identifier:function(n){
+        if(reserved.has(n.name)) return;
+        const low=n.name.toLowerCase();
+        if(!map.has(low)){let nn=next();while(used.has(nn)) nn=next();used.add(nn);map.set(low,nn);}
+        n.name=map.get(low);
+      }});
+      return this;
+    }
+    deob(){
+      this.parse().collect().resolve().fold().flatten().rmdead().rename();
+      let code=this.gen();
+      if(this.opts.jsx) code=this.convjsx(code);
+      return code;
+    }
+    convjsx(code){
+      let res=code;
+      const pat=/React\.createElement\s*\(\s*(['"][^'"]+['"]|\{[^}]*\})\s*,\s*([^,]*)\s*,(.*)\)/g;
+      res=res.replace(pat,function(m,t,p,children){
+        let typ=t;
+        if(typ.startsWith('"')||typ.startsWith("'")) typ=typ.slice(1,-1);
+        let props=p.trim();
+        if(props==='null') props='';
+        let childstr=children.trim();
+        if(childstr){
+          childstr=childstr.replace(/^,\s*/,'');
+          childstr=childstr.replace(/\s*,\s*$/,'');
+        }
+        let inner='';
+        if(childstr){
+          if(childstr.startsWith('[')&&childstr.endsWith(']')){
+            inner=childstr.slice(1,-1).trim();
+          }else{
+            inner=childstr;
+          }
+        }
+        let attrs='';
+        if(props&&props!=='{}'){
+          attrs=' '+props.replace(/^{/,'').replace(/}$/,'').replace(/:/g,'=').replace(/,/g,' ');
+        }
+        return '<'+typ+attrs+'>'+inner+'</'+typ+'>';
+      });
+      return res;
+    }
+  }
+  function deobf(code,jsx){const d=new deob(code,{jsx:jsx});try{return d.deob();}catch(e){return '// deobfuscation error: '+e.message+'\n'+code;}}
+  async function run(){
+    const src=inp.value;
+    if(!src.trim()){out.value='no input';envpre.innerText='empty';return;}
+    out.value='processing...';
+    const env=capenv();
+    envpre.innerText=JSON.stringify(env,null,2);
+    try{const res=deobf(src,jsxchk.checked);out.value=res;}catch(e){out.value='fatal: '+e.message;}
+  }
+  runbtn.addEventListener('click',run);
+  clrbtn.addEventListener('click',function(){inp.value='';out.value='';envpre.innerText='cleared';updstat();});
+  sampbtn.addEventListener('click',function(){
+    inp.value='var _0x1234=["hello","world"];\nvar a=_0x1234[0]+" "+_0x1234[1];\nconsole.log(a);\nif(false){var x=1;}\ndebugger;\nwhile(true){var state=0;switch(state){case 0: state=1; break; case 1: break;}}\nReact.createElement("div",null,React.createElement("span",null,"Hello ",name));';
+    updstat();out.value='';envpre.innerText='sample loaded. click deobfuscate.';
+  });
+  fileup.addEventListener('change',function(e){
+    const f=e.target.files[0];if(!f)return;
+    const r=new FileReader();r.onload=function(ev){inp.value=ev.target.result;updstat();};r.readAsText(f);fileup.value='';
+  });
+  copybtn.addEventListener('click',async function(){
+    if(!out.value)return;
+    await navigator.clipboard.writeText(out.value);
+    const old=copybtn.innerText;copybtn.innerText='copied';setTimeout(function(){copybtn.innerText=old;},1200);
+  });
+  dwnbtn.addEventListener('click',function(){
+    if(!out.value)return;
+    const blob=new Blob([out.value],{type:'text/javascript'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='deobfuscated.js';a.click();URL.revokeObjectURL(a.href);
+  });
+  updstat();
+})();
+</script>
 </body>
 </html>
