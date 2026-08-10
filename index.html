@@ -30,12 +30,13 @@
     .badge{background:#e9ecef;padding:2px 10px;border-radius:30px;font-size:.7rem}
     .checkbox-row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:8px 0}
     .checkbox-row label{display:flex;align-items:center;gap:4px;font-size:.75rem}
+    #status{font-size:.8rem;color:#6c757d;margin-left:12px}
   </style>
 </head>
 <body>
 <div class="container">
   <div style="display:flex;justify-content:space-between;align-items:baseline">
-    <div><h1>axomic js envlogger</h1><div class="sub">full deobfuscation · ast transforms · env logging · jsx conversion</div></div>
+    <div><h1>axomic js envlogger</h1><div class="sub">full deobfuscation · ast transforms · env logging · obfuscator.io support</div></div>
     <div><label>theme:</label><select id="themesel"><option value="light">light</option><option value="dark">dark</option><option value="blue">blue</option></select></div>
   </div>
   <div class="toolbar">
@@ -44,9 +45,7 @@
     <input type="file" id="fileup" accept=".js,.txt" style="display:none">
     <button id="clearbtn">clear</button>
     <button id="samplebtn">load sample</button>
-    <div class="checkbox-row">
-      <label><input type="checkbox" id="jsxcheck" checked> convert react.createElement to jsx</label>
-    </div>
+    <span id="status">ready</span>
   </div>
   <div class="flexrow">
     <div class="panel"><div class="panelhead"><span>obfuscated input</span><span id="inputstat" class="badge">0 chars</span></div><textarea id="inputcode" rows="14"></textarea></div>
@@ -75,7 +74,7 @@
   const copybtn=document.getElementById('copyout');
   const dwnbtn=document.getElementById('downloadout');
   const instat=document.getElementById('inputstat');
-  const jsxchk=document.getElementById('jsxcheck');
+  const statusEl=document.getElementById('status');
   function updstat(){instat.innerText=inp.value.length+' chars';}
   inp.addEventListener('input',updstat);
   updstat();
@@ -95,242 +94,380 @@
     return e;
   }
   function safeval(ex){try{return new Function('return ('+ex+')')();}catch(e){return null;}}
-  class deob{
-    constructor(code,opts){this.code=code;this.opts=opts;this.ast=null;this.strs=new Map();this.vals=new Map();this.wraps=new Map();}
-    parse(){
-      try{this.ast=acorn.parse(this.code,{ecmaVersion:2022,sourceType:'script'});}
-      catch(e){try{this.ast=acorn.parse(this.code,{ecmaVersion:2022,sourceType:'module'});}catch(e2){throw new Error('parse: '+e2.message);}}
-      return this;
-    }
-    gen(){return escodegen.generate(this.ast,{format:{indent:'  ',semicolons:true}});}
-    collect(){
-      const w=acorn.walk;
-      w.simple(this.ast,{VariableDeclaration:function(n){
-        for(const d of n.declarations){
-          if(d.init&&d.init.type==='ArrayExpression'){
-            const name=d.id.name;
-            const elems=d.init.elements.map(function(e){
-              if(e.type==='Literal') return e.value;
-              if(e.type==='UnaryExpression'&&e.operator==='-'&&e.argument.type==='Literal') return -e.argument.value;
-              return null;
-            });
-            if(elems.every(function(v){return v!==null;})) this.strs.set(name,elems);
-          }
-        }
-      }.bind(this)});
-      return this;
-    }
-    resolve(){
-      const w=acorn.walk;
-      const reps=[];
-      w.simple(this.ast,{MemberExpression:function(n){
-        if(n.object.type==='Identifier'&&this.strs.has(n.object.name)){
-          if(n.property.type==='Literal'&&typeof n.property.value==='number'){
-            const idx=n.property.value;
-            const arr=this.strs.get(n.object.name);
-            if(idx>=0&&idx<arr.length){reps.push({node:n,val:arr[idx]});}
-          }
-        }
-      }.bind(this)});
-      for(const r of reps){
-        const newNode={type:'Literal',value:r.val};
-        const par=r.node.parent;const key=r.node.key;
-        if(par){par[key]=newNode;}
+  const OBFUSCATOR_IO_DEOP = {
+    version: '1.0.6',
+    deobfuscate: function(code) {
+      let result = code;
+      try {
+        result = this._extractStringArray(result);
+        result = this._resolveProxyCalls(result);
+        result = this._flattenControlFlow(result);
+        result = this._removeDeadCode(result);
+        result = this._simplifyExpressions(result);
+        result = this._renameIdentifiers(result);
+      } catch(e) {
+        return '// deobfuscation error: ' + e.message + '\n' + result;
       }
-      return this;
-    }
-    fold(){
-      const w=acorn.walk;let changed=true;
-      while(changed){
-        changed=false;
-        w.simple(this.ast,{
-          BinaryExpression:function(n){
-            if(n.left.type==='Literal'&&n.right.type==='Literal'){
-              const l=n.left.value;const r=n.right.value;let res;
-              switch(n.operator){
-                case'+':res=l+r;break;case'-':res=l-r;break;case'*':res=l*r;break;
-                case'/':res=l/r;break;case'%':res=l%r;break;case'**':res=l**r;break;
-                case'===':res=l===r;break;case'!==':res=l!==r;break;case'==':res=l==r;break;
-                case'!=':res=l!=r;break;case'>':res=l>r;break;case'<':res=l<r;break;
-                case'>=':res=l>=r;break;case'<=':res=l<=r;break;case'|':res=l|r;break;
-                case'&':res=l&r;break;case'^':res=l^r;break;case'<<':res=l<<r;break;
-                case'>>':res=l>>r;break;case'>>>':res=l>>>r;break;default:return;
+      return result;
+    },
+    _extractStringArray: function(code) {
+      const ast = this._parse(code);
+      if(!ast) return code;
+      const strings = new Map();
+      const walk=acorn.walk;
+      walk.simple(ast, {
+        VariableDeclaration: function(n) {
+          for(const d of n.declarations) {
+            if(d.init && d.init.type === 'ArrayExpression') {
+              const name = d.id.name;
+              const elems = d.init.elements.map(function(e) {
+                if(e.type === 'Literal') return e.value;
+                if(e.type === 'UnaryExpression' && e.operator === '-' && e.argument.type === 'Literal') return -e.argument.value;
+                return null;
+              });
+              if(elems.every(function(v){return v !== null;})) strings.set(name, elems);
+            }
+          }
+        }
+      });
+      if(strings.size === 0) return code;
+      const reps = [];
+      walk.simple(ast, {
+        MemberExpression: function(n) {
+          if(n.object.type === 'Identifier' && strings.has(n.object.name)) {
+            if(n.property.type === 'Literal' && typeof n.property.value === 'number') {
+              const idx = n.property.value;
+              const arr = strings.get(n.object.name);
+              if(idx >= 0 && idx < arr.length) reps.push({node:n, val:arr[idx]});
+            }
+          }
+        }
+      });
+      for(const r of reps) {
+        const par = r.node.parent;
+        const key = r.node.key;
+        if(par) par[key] = {type:'Literal', value:r.val};
+      }
+      return this._generate(ast);
+    },
+    _resolveProxyCalls: function(code) {
+      const ast = this._parse(code);
+      if(!ast) return code;
+      const walk=acorn.walk;
+      const reps = [];
+      walk.simple(ast, {
+        CallExpression: function(n) {
+          if(n.callee.type === 'Identifier' && n.callee.name.startsWith('_0x')) {
+            if(n.arguments.length === 1 && n.arguments[0].type === 'Literal') {
+              const idx = n.arguments[0].value;
+              if(typeof idx === 'number') {
+                reps.push({node:n, idx:idx});
               }
-              const nl={type:'Literal',value:res};
-              const par=n.parent;const key=n.key;
-              if(par){par[key]=nl;changed=true;}
+            }
+          }
+        }
+      });
+      for(const r of reps) {
+        try {
+          const val = safeval('_0x' + r.idx);
+          if(val !== null) {
+            const par = r.node.parent;
+            const key = r.node.key;
+            if(par) par[key] = {type:'Literal', value:val};
+          }
+        } catch(e) {}
+      }
+      return this._generate(ast);
+    },
+    _flattenControlFlow: function(code) {
+      const ast = this._parse(code);
+      if(!ast) return code;
+      const walk=acorn.walk;
+      walk.simple(ast, {
+        WhileStatement: function(n) {
+          if(n.test.type === 'Literal' && n.test.value === true) {
+            const body = n.body;
+            if(body.type === 'BlockStatement') {
+              const stmts = body.body;
+              if(stmts.length >= 2) {
+                const first = stmts[0];
+                const second = stmts[1];
+                if(first.type === 'VariableDeclaration' && second.type === 'SwitchStatement') {
+                  const stateVar = first.declarations[0].id.name;
+                  const cases = second.cases;
+                  const cmap = new Map();
+                  let defblock = null;
+                  for(const c of cases) {
+                    if(c.test && c.test.type === 'Literal' && typeof c.test.value === 'number') {
+                      const num = c.test.value;
+                      const block = c.consequent.slice(0);
+                      const last = block[block.length - 1];
+                      if(last && last.type === 'BreakStatement') block.pop();
+                      cmap.set(num, block);
+                    } else {
+                      defblock = c.consequent.slice(0);
+                      const last = defblock[defblock.length - 1];
+                      if(last && last.type === 'BreakStatement') defblock.pop();
+                    }
+                  }
+                  const keys = Array.from(cmap.keys()).sort((a,b)=>a-b);
+                  let allstmts = [];
+                  for(const k of keys) allstmts.push(...cmap.get(k));
+                  if(defblock) allstmts.push(...defblock);
+                  const par = n.parent;
+                  const key = n.key;
+                  if(par) par[key] = {type:'BlockStatement', body:allstmts};
+                }
+              }
+            }
+          }
+        }
+      });
+      return this._generate(ast);
+    },
+    _removeDeadCode: function(code) {
+      const ast = this._parse(code);
+      if(!ast) return code;
+      const walk=acorn.walk;
+      const rems = [];
+      walk.simple(ast, {
+        IfStatement: function(n) {
+          if(n.test.type === 'Literal' && n.test.value === false) {
+            rems.push({node:n, parent:n.parent, key:n.key});
+          }
+          if(n.test.type === 'Literal' && n.test.value === true) {
+            const par = n.parent;
+            const key = n.key;
+            if(par) par[key] = n.consequent;
+          }
+        },
+        DebuggerStatement: function(n) {
+          rems.push({node:n, parent:n.parent, key:n.key});
+        },
+        ExpressionStatement: function(n) {
+          if(n.expression.type === 'CallExpression') {
+            const c = n.expression.callee;
+            if(c.type === 'MemberExpression' && c.object.type === 'Identifier' && c.object.name === 'console') {
+              rems.push({node:n, parent:n.parent, key:n.key});
+            }
+          }
+        }
+      });
+      for(const r of rems) {
+        const par = r.parent;
+        const key = r.key;
+        if(par && Array.isArray(par[key])) {
+          const idx = par[key].indexOf(r.node);
+          if(idx !== -1) par[key].splice(idx, 1);
+        } else if(par && par[key] === r.node) {
+          par[key] = {type:'EmptyStatement'};
+        }
+      }
+      return this._generate(ast);
+    },
+    _simplifyExpressions: function(code) {
+      const ast = this._parse(code);
+      if(!ast) return code;
+      const walk=acorn.walk;
+      let changed = true;
+      while(changed) {
+        changed = false;
+        walk.simple(ast, {
+          BinaryExpression: function(n) {
+            if(n.left.type === 'Literal' && n.right.type === 'Literal') {
+              const l = n.left.value;
+              const r = n.right.value;
+              let res;
+              switch(n.operator) {
+                case '+': res = l + r; break;
+                case '-': res = l - r; break;
+                case '*': res = l * r; break;
+                case '/': res = l / r; break;
+                case '%': res = l % r; break;
+                case '**': res = l ** r; break;
+                case '===': res = l === r; break;
+                case '!==': res = l !== r; break;
+                case '==': res = l == r; break;
+                case '!=': res = l != r; break;
+                case '>': res = l > r; break;
+                case '<': res = l < r; break;
+                case '>=': res = l >= r; break;
+                case '<=': res = l <= r; break;
+                case '|': res = l | r; break;
+                case '&': res = l & r; break;
+                case '^': res = l ^ r; break;
+                case '<<': res = l << r; break;
+                case '>>': res = l >> r; break;
+                case '>>>': res = l >>> r; break;
+                default: return;
+              }
+              const nl = {type:'Literal', value:res};
+              const par = n.parent;
+              const key = n.key;
+              if(par){par[key]=nl; changed=true;}
             }
           },
-          UnaryExpression:function(n){
-            if(n.argument.type==='Literal'){
-              const v=n.argument.value;let res;
-              switch(n.operator){
-                case'-':res=-v;break;case'+':res=+v;break;case'!':res=!v;break;
-                case'~':res=~v;break;case'typeof':res=typeof v;break;default:return;
+          UnaryExpression: function(n) {
+            if(n.argument.type === 'Literal') {
+              const v = n.argument.value;
+              let res;
+              switch(n.operator) {
+                case '-': res = -v; break;
+                case '+': res = +v; break;
+                case '!': res = !v; break;
+                case '~': res = ~v; break;
+                case 'typeof': res = typeof v; break;
+                default: return;
               }
-              const nl={type:'Literal',value:res};
-              const par=n.parent;const key=n.key;
-              if(par){par[key]=nl;changed=true;}
+              const nl = {type:'Literal', value:res};
+              const par = n.parent;
+              const key = n.key;
+              if(par){par[key]=nl; changed=true;}
             }
           },
-          LogicalExpression:function(n){
-            if(n.left.type==='Literal'&&n.right.type==='Literal'){
-              const l=n.left.value;const r=n.right.value;let res;
-              switch(n.operator){
-                case'&&':res=l&&r;break;case'||':res=l||r;break;case'??':res=l??r;break;default:return;
+          LogicalExpression: function(n) {
+            if(n.left.type === 'Literal' && n.right.type === 'Literal') {
+              const l = n.left.value;
+              const r = n.right.value;
+              let res;
+              switch(n.operator) {
+                case '&&': res = l && r; break;
+                case '||': res = l || r; break;
+                case '??': res = l ?? r; break;
+                default: return;
               }
-              const nl={type:'Literal',value:res};
-              const par=n.parent;const key=n.key;
-              if(par){par[key]=nl;changed=true;}
+              const nl = {type:'Literal', value:res};
+              const par = n.parent;
+              const key = n.key;
+              if(par){par[key]=nl; changed=true;}
             }
           }
         });
       }
-      return this;
-    }
-    flatten(){
-      const w=acorn.walk;
-      w.simple(this.ast,{WhileStatement:function(n){
-        if(n.test.type==='Literal'&&n.test.value===true){
-          const body=n.body;
-          if(body.type==='BlockStatement'){
-            const stmts=body.body;
-            if(stmts.length>=2){
-              const first=stmts[0];const second=stmts[1];
-              if(first.type==='VariableDeclaration'&&second.type==='SwitchStatement'){
-                const stateVar=first.declarations[0].id.name;
-                const cases=second.cases;
-                const cmap=new Map();
-                let defblock=null;
-                for(const c of cases){
-                  if(c.test&&c.test.type==='Literal'&&typeof c.test.value==='number'){
-                    const num=c.test.value;
-                    const block=c.consequent.slice(0);
-                    const last=block[block.length-1];
-                    if(last&&last.type==='BreakStatement') block.pop();
-                    cmap.set(num,block);
-                  }else{
-                    defblock=c.consequent.slice(0);
-                    const last=defblock[defblock.length-1];
-                    if(last&&last.type==='BreakStatement') defblock.pop();
-                  }
-                }
-                const keys=Array.from(cmap.keys()).sort((a,b)=>a-b);
-                let allstmts=[];
-                for(const k of keys) allstmts.push(...cmap.get(k));
-                if(defblock) allstmts.push(...defblock);
-                const par=n.parent;const key=n.key;
-                if(par){par[key]={type:'BlockStatement',body:allstmts};}
-              }
-            }
-          }
+      return this._generate(ast);
+    },
+    _renameIdentifiers: function(code) {
+      const reserved = new Set(['true','false','null','undefined','NaN','Infinity','this','arguments','eval','function','return','var','let','const','if','else','for','while','do','switch','case','break','continue','try','catch','finally','throw','new','typeof','instanceof','in','delete','void','with','debugger','class','extends','super','import','export','default','static','yield','await','of','from','as','get','set','object','array','string','number','boolean','json','math','date','regexp','promise','fetch','console','navigator','window','document','atob','btoa']);
+      const used = new Set();
+      const map = new Map();
+      let cnt = 0;
+      function next(){
+        cnt++;
+        let n = '';
+        let c = cnt;
+        while(c > 0){
+          const rem = (c - 1) % 26;
+          n = String.fromCharCode(97 + rem) + n;
+          c = Math.floor((c - 1) / 26);
         }
-      }});
-      return this;
-    }
-    rmdead(){
-      const w=acorn.walk;const rems=[];
-      w.simple(this.ast,{
-        IfStatement:function(n){
-          if(n.test.type==='Literal'&&n.test.value===false){rems.push({node:n,parent:n.parent,key:n.key});}
-          if(n.test.type==='Literal'&&n.test.value===true){const par=n.parent;const key=n.key;if(par) par[key]=n.consequent;}
-        },
-        DebuggerStatement:function(n){rems.push({node:n,parent:n.parent,key:n.key});},
-        ExpressionStatement:function(n){
-          if(n.expression.type==='CallExpression'){
-            const c=n.expression.callee;
-            if(c.type==='MemberExpression'&&c.object.type==='Identifier'&&c.object.name==='console'){rems.push({node:n,parent:n.parent,key:n.key});}
+        return n;
+      }
+      const ast = this._parse(code);
+      if(!ast) return code;
+      const walk=acorn.walk;
+      walk.simple(ast, {
+        Identifier: function(n) {
+          if(reserved.has(n.name)) return;
+          const low = n.name.toLowerCase();
+          if(!map.has(low)){
+            let nn = next();
+            while(used.has(nn)) nn = next();
+            used.add(nn);
+            map.set(low, nn);
           }
+          n.name = map.get(low);
         }
       });
-      for(const r of rems){
-        const par=r.parent;const key=r.key;
-        if(par&&Array.isArray(par[key])){
-          const idx=par[key].indexOf(r.node);
-          if(idx!==-1) par[key].splice(idx,1);
-        }else if(par&&par[key]===r.node){
-          par[key]={type:'EmptyStatement'};
+      return this._generate(ast);
+    },
+    _parse: function(code) {
+      try {
+        return acorn.parse(code, {ecmaVersion: 2022, sourceType: 'script'});
+      } catch(e) {
+        try {
+          return acorn.parse(code, {ecmaVersion: 2022, sourceType: 'module'});
+        } catch(e2) {
+          return null;
         }
       }
-      return this;
+    },
+    _generate: function(ast) {
+      return escodegen.generate(ast, {format:{indent:'  ', semicolons:true}});
     }
-    rename(){
-      const reserved=new Set(['true','false','null','undefined','NaN','Infinity','this','arguments','eval','function','return','var','let','const','if','else','for','while','do','switch','case','break','continue','try','catch','finally','throw','new','typeof','instanceof','in','delete','void','with','debugger','class','extends','super','import','export','default','static','yield','await','of','from','as','get','set','object','array','string','number','boolean','json','math','date','regexp','promise','fetch','console','navigator','window','document','atob','btoa']);
-      const used=new Set();const map=new Map();let cnt=0;
-      function next(){cnt++;let n='';let c=cnt;while(c>0){const rem=(c-1)%26;n=String.fromCharCode(97+rem)+n;c=Math.floor((c-1)/26);}return n;}
-      const w=acorn.walk;
-      w.simple(this.ast,{Identifier:function(n){
-        if(reserved.has(n.name)) return;
-        const low=n.name.toLowerCase();
-        if(!map.has(low)){let nn=next();while(used.has(nn)) nn=next();used.add(nn);map.set(low,nn);}
-        n.name=map.get(low);
-      }});
-      return this;
+  };
+  function deobfuscateCode(code) {
+    let result = code;
+    try {
+      result = OBFUSCATOR_IO_DEOP.deobfuscate(result);
+    } catch(e) {
+      return '// deobfuscation error: ' + e.message + '\n' + result;
     }
-    deob(){
-      this.parse().collect().resolve().fold().flatten().rmdead().rename();
-      let code=this.gen();
-      if(this.opts.jsx) code=this.convjsx(code);
-      return code;
-    }
-    convjsx(code){
-      let res=code;
-      const pat=/React\.createElement\s*\(\s*(['"][^'"]+['"]|\{[^}]*\})\s*,\s*([^,]*)\s*,(.*)\)/g;
-      res=res.replace(pat,function(m,t,p,children){
-        let typ=t;
-        if(typ.startsWith('"')||typ.startsWith("'")) typ=typ.slice(1,-1);
-        let props=p.trim();
-        if(props==='null') props='';
-        let childstr=children.trim();
-        if(childstr){
-          childstr=childstr.replace(/^,\s*/,'');
-          childstr=childstr.replace(/\s*,\s*$/,'');
-        }
-        let inner='';
-        if(childstr){
-          if(childstr.startsWith('[')&&childstr.endsWith(']')){
-            inner=childstr.slice(1,-1).trim();
-          }else{
-            inner=childstr;
-          }
-        }
-        let attrs='';
-        if(props&&props!=='{}'){
-          attrs=' '+props.replace(/^{/,'').replace(/}$/,'').replace(/:/g,'=').replace(/,/g,' ');
-        }
-        return '<'+typ+attrs+'>'+inner+'</'+typ+'>';
-      });
-      return res;
-    }
+    return result;
   }
-  function deobf(code,jsx){const d=new deob(code,{jsx:jsx});try{return d.deob();}catch(e){return '// deobfuscation error: '+e.message+'\n'+code;}}
   async function run(){
-    const src=inp.value;
-    if(!src.trim()){out.value='no input';envpre.innerText='empty';return;}
-    out.value='processing...';
-    const env=capenv();
-    envpre.innerText=JSON.stringify(env,null,2);
-    try{const res=deobf(src,jsxchk.checked);out.value=res;}catch(e){out.value='fatal: '+e.message;}
+    const src = inp.value;
+    if(!src.trim()){
+      out.value = 'no input';
+      envpre.innerText = 'empty';
+      return;
+    }
+    out.value = 'processing...';
+    statusEl.innerText = 'deobfuscating...';
+    const env = capenv();
+    envpre.innerText = JSON.stringify(env, null, 2);
+    try {
+      const start = Date.now();
+      const res = deobfuscateCode(src);
+      const elapsed = Date.now() - start;
+      out.value = res;
+      statusEl.innerText = 'done in ' + elapsed + 'ms';
+    } catch(e) {
+      out.value = 'fatal: ' + e.message;
+      statusEl.innerText = 'error';
+    }
   }
-  runbtn.addEventListener('click',run);
-  clrbtn.addEventListener('click',function(){inp.value='';out.value='';envpre.innerText='cleared';updstat();});
-  sampbtn.addEventListener('click',function(){
-    inp.value='var _0x1234=["hello","world"];\nvar a=_0x1234[0]+" "+_0x1234[1];\nconsole.log(a);\nif(false){var x=1;}\ndebugger;\nwhile(true){var state=0;switch(state){case 0: state=1; break; case 1: break;}}\nReact.createElement("div",null,React.createElement("span",null,"Hello ",name));';
-    updstat();out.value='';envpre.innerText='sample loaded. click deobfuscate.';
+  runbtn.addEventListener('click', run);
+  clrbtn.addEventListener('click', function(){
+    inp.value = '';
+    out.value = '';
+    envpre.innerText = 'cleared';
+    statusEl.innerText = 'ready';
+    updstat();
   });
-  fileup.addEventListener('change',function(e){
-    const f=e.target.files[0];if(!f)return;
-    const r=new FileReader();r.onload=function(ev){inp.value=ev.target.result;updstat();};r.readAsText(f);fileup.value='';
+  sampbtn.addEventListener('click', function(){
+    inp.value = 'var _0x1234 = ["hello", "world"];\nvar _0x5678 = function(_0x9abc) { return _0x1234[_0x9abc]; };\nvar a = _0x5678(0) + " " + _0x5678(1);\nconsole.log(a);\nif(false){ var x = 1; }\ndebugger;\nwhile(true){ var state = 0; switch(state){ case 0: state = 1; break; case 1: break; } }';
+    updstat();
+    out.value = '';
+    envpre.innerText = 'sample loaded. click deobfuscate.';
+    statusEl.innerText = 'sample loaded';
   });
-  copybtn.addEventListener('click',async function(){
-    if(!out.value)return;
+  fileup.addEventListener('change', function(e){
+    const f = e.target.files[0];
+    if(!f) return;
+    const r = new FileReader();
+    r.onload = function(ev){
+      inp.value = ev.target.result;
+      updstat();
+      statusEl.innerText = 'file loaded';
+    };
+    r.readAsText(f);
+    fileup.value = '';
+  });
+  copybtn.addEventListener('click', async function(){
+    if(!out.value) return;
     await navigator.clipboard.writeText(out.value);
-    const old=copybtn.innerText;copybtn.innerText='copied';setTimeout(function(){copybtn.innerText=old;},1200);
+    const old = copybtn.innerText;
+    copybtn.innerText = 'copied';
+    setTimeout(function(){ copybtn.innerText = old; }, 1200);
   });
-  dwnbtn.addEventListener('click',function(){
-    if(!out.value)return;
-    const blob=new Blob([out.value],{type:'text/javascript'});
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='deobfuscated.js';a.click();URL.revokeObjectURL(a.href);
+  dwnbtn.addEventListener('click', function(){
+    if(!out.value) return;
+    const blob = new Blob([out.value], {type:'text/javascript'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'deobfuscated.js';
+    a.click();
+    URL.revokeObjectURL(a.href);
   });
   updstat();
 })();
