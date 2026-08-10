@@ -28,8 +28,6 @@
     .envhead{background:#f1f3f5;padding:8px 18px;font-size:.7rem;border-bottom:1px solid #dee2e6}
     pre{margin:0;padding:14px;overflow-x:auto;font-size:11px;background:#e9ecef;max-height:260px}
     .badge{background:#e9ecef;padding:2px 10px;border-radius:30px;font-size:.7rem}
-    .checkbox-row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:8px 0}
-    .checkbox-row label{display:flex;align-items:center;gap:4px;font-size:.75rem}
     #status{font-size:.8rem;color:#6c757d;margin-left:12px}
   </style>
 </head>
@@ -56,7 +54,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn-walk/8.3.2/walk.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/escodegen/2.1.0/escodegen.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/webcrack@2.0.0/dist/webcrack.min.js"></script>
 <script>
 (function(){
   const themesel=document.getElementById('themesel');
@@ -133,33 +130,150 @@
     return renamed;
   }
   function finalClean(s){return s.replace(/;\s*}/g,'}').replace(/\{\s*}/g,'{}').replace(/\n\s*\n/g,'\n').trim();}
-  async function deobfuscateWithWebcrack(code){
-    try{
-      const result=await webcrack(code);
-      let cleaned=result.code||'';
-      cleaned=removeComments(cleaned);
-      cleaned=renameIdentifiers(cleaned);
-      cleaned=finalClean(cleaned);
-      return cleaned;
-    }catch(e){
-      console.warn('webcrack failed:',e);
-      return null;
+  function deobfuscateCode(code){
+    let ast;
+    try{ast=acorn.parse(code,{ecmaVersion:2022,sourceType:'script'});}
+    catch(e){try{ast=acorn.parse(code,{ecmaVersion:2022,sourceType:'module'});}catch(e2){return code;}}
+    const walk=acorn.walk;
+    const stringArrays=new Map();
+    const proxyCalls=[];
+    const deadNodes=[];
+    let changed=true;
+    while(changed){
+      changed=false;
+      walk.simple(ast,{
+        VariableDeclaration:function(n){
+          for(const d of n.declarations){
+            if(d.init&&d.init.type==='ArrayExpression'){
+              const name=d.id.name;
+              const elems=d.init.elements.map(function(e){
+                if(e.type==='Literal') return e.value;
+                if(e.type==='UnaryExpression'&&e.operator==='-'&&e.argument.type==='Literal') return -e.argument.value;
+                return null;
+              });
+              if(elems.every(function(v){return v!==null;})) stringArrays.set(name,elems);
+            }
+          }
+        },
+        CallExpression:function(n){
+          if(n.callee.type==='Identifier'&&/^_0x[a-f0-9]+$/.test(n.callee.name)){
+            if(n.arguments.length===1&&n.arguments[0].type==='Literal'&&typeof n.arguments[0].value==='number'){
+              proxyCalls.push({node:n,idx:n.arguments[0].value});
+            }
+          }
+        },
+        IfStatement:function(n){
+          if(n.test.type==='Literal'&&n.test.value===false){
+            deadNodes.push({node:n,parent:n.parent,key:n.key});
+            changed=true;
+          }
+          if(n.test.type==='Literal'&&n.test.value===true){
+            const par=n.parent;const key=n.key;
+            if(par){par[key]=n.consequent;changed=true;}
+          }
+        },
+        DebuggerStatement:function(n){
+          deadNodes.push({node:n,parent:n.parent,key:n.key});
+          changed=true;
+        },
+        ExpressionStatement:function(n){
+          if(n.expression.type==='CallExpression'){
+            const c=n.expression.callee;
+            if(c.type==='MemberExpression'&&c.object.type==='Identifier'&&c.object.name==='console'){
+              deadNodes.push({node:n,parent:n.parent,key:n.key});
+              changed=true;
+            }
+          }
+        }
+      });
+      for(const r of deadNodes){
+        const par=r.parent;const key=r.key;
+        if(par&&Array.isArray(par[key])){
+          const idx=par[key].indexOf(r.node);
+          if(idx!==-1) par[key].splice(idx,1);
+        }else if(par&&par[key]===r.node){
+          par[key]={type:'EmptyStatement'};
+        }
+      }
+      deadNodes.length=0;
+      for(const rep of proxyCalls){
+        const arr=stringArrays.get(rep.node.callee.name);
+        if(arr&&rep.idx<arr.length){
+          const val=arr[rep.idx];
+          const par=rep.node.parent;const key=rep.node.key;
+          if(par){par[key]={type:'Literal',value:val};changed=true;}
+        }
+      }
+      proxyCalls.length=0;
+      walk.simple(ast,{
+        MemberExpression:function(n){
+          if(n.object.type==='Identifier'&&stringArrays.has(n.object.name)){
+            if(n.property.type==='Literal'&&typeof n.property.value==='number'){
+              const idx=n.property.value;
+              const arr=stringArrays.get(n.object.name);
+              if(idx>=0&&idx<arr.length){
+                const par=n.parent;const key=n.key;
+                if(par){par[key]={type:'Literal',value:arr[idx]};changed=true;}
+              }
+            }
+          }
+        }
+      });
+      walk.simple(ast,{
+        WhileStatement:function(n){
+          if(n.test.type==='Literal'&&n.test.value===true){
+            const body=n.body;
+            if(body.type==='BlockStatement'){
+              const stmts=body.body;
+              if(stmts.length>=2){
+                const first=stmts[0];const second=stmts[1];
+                if(first.type==='VariableDeclaration'&&second.type==='SwitchStatement'){
+                  const stateVar=first.declarations[0].id.name;
+                  const cases=second.cases;
+                  const cmap=new Map();
+                  let defblock=null;
+                  for(const c of cases){
+                    if(c.test&&c.test.type==='Literal'&&typeof c.test.value==='number'){
+                      const num=c.test.value;
+                      const block=c.consequent.slice(0);
+                      const last=block[block.length-1];
+                      if(last&&last.type==='BreakStatement') block.pop();
+                      cmap.set(num,block);
+                    }else{
+                      defblock=c.consequent.slice(0);
+                      const last=defblock[defblock.length-1];
+                      if(last&&last.type==='BreakStatement') defblock.pop();
+                    }
+                  }
+                  const keys=Array.from(cmap.keys()).sort((a,b)=>a-b);
+                  let allstmts=[];
+                  for(const k of keys) allstmts.push(...cmap.get(k));
+                  if(defblock) allstmts.push(...defblock);
+                  const par=n.parent;const key=n.key;
+                  if(par){par[key]={type:'BlockStatement',body:allstmts};changed=true;}
+                }
+              }
+            }
+          }
+        }
+      });
     }
+    let result=escodegen.generate(ast,{format:{indent:'  ',semicolons:true}});
+    result=removeComments(result);
+    result=renameIdentifiers(result);
+    result=finalClean(result);
+    return result;
   }
   async function run(){
     const src=inp.value;
     if(!src.trim()){out.value='no input';envpre.innerText='empty';return;}
     out.value='processing...';
-    statusEl.innerText='deobfuscating with webcrack...';
+    statusEl.innerText='deobfuscating...';
     const env=capenv();
     envpre.innerText=JSON.stringify(env,null,2);
     try{
       const start=Date.now();
-      let result=await deobfuscateWithWebcrack(src);
-      if(!result){
-        statusEl.innerText='webcrack failed, falling back to built-in deobfuscator...';
-        result=src; 
-      }
+      const result=deobfuscateCode(src);
       const elapsed=Date.now()-start;
       out.value=result;
       statusEl.innerText='done in '+elapsed+'ms';
@@ -173,7 +287,7 @@
     inp.value='';out.value='';envpre.innerText='cleared';statusEl.innerText='ready';updstat();
   });
   sampbtn.addEventListener('click',function(){
-    inp.value='function _0x22d4(){var _0x169cb8=["hello","world"]; _0x22d4=function(){return _0x169cb8;}; return _0x22d4();} function _0xc688(_0x117694,_0x579650){var _0x127a46=_0x22d4(); return _0x127a46[_0x117694];} console.log(_0xc688(0,0));';
+    inp.value='function _0x22d4(){var _0x169cb8=["hello","world"]; _0x22d4=function(){return _0x169cb8;}; return _0x22d4();} function _0xc688(_0x117694,_0x579650){var _0x127a46=_0x22d4(); return _0x127a46[_0x117694];} console.log(_0xc688(0,0)); if(false){var x=1;} debugger; while(true){var state=0;switch(state){case 0: state=1; break; case 1: break;}}';
     updstat();out.value='';envpre.innerText='sample loaded. click deobfuscate.';statusEl.innerText='sample loaded';
   });
   fileup.addEventListener('change',function(e){
